@@ -1,15 +1,15 @@
-name: Bot Auto Quote ID
+name: Neon Quote Bot
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
-  workflow_dispatch:
+    - cron: '*/10 * * * *' # Jalan tiap 10 menit
+  workflow_dispatch:      # Bisa diklik manual
 
 jobs:
-  post-quote:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Setup Python
@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Depedencies
+      - name: Install Dependencies
         run: pip install -r requirements.txt
 
       - name: Run Bot
