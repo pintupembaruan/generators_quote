@@ -4,93 +4,132 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from deep_translator import GoogleTranslator
 
+# 1. DOWNLOAD FONT OTOMATIS (Agar Anti Gagal & Futuristik)
+def download_font():
+    font_url = "https://github.com/google/fonts/raw/main/ofl/orbitron/static/Orbitron-Bold.ttf"
+    font_path = "font_futuristic.ttf"
+    if not os.path.exists(font_path):
+        print("Sedang mengunduh font futuristik...")
+        r = requests.get(font_url)
+        with open(font_path, 'wb') as f:
+            f.write(r.content)
+    return font_path
+
 def get_random_quote():
-    """Mengambil quote dari API publik dengan sistem cadangan."""
     try:
-        # Menggunakan ZenQuotes API (lebih stabil)
         response = requests.get("https://zenquotes.io/api/random", timeout=10)
         if response.status_code == 200:
             data = response.json()
             return data[0]['q'], data[0]['a']
-    except Exception as e:
-        print(f"Gagal ambil API: {e}")
-    
-    # Cadangan jika internet/API bermasalah
-    backup = [
-        ("Keep going. Each step is a progress.", "Unknown"),
-        ("Life is what happens when you're busy making other plans.", "John Lennon"),
-        ("The only way to do great work is to love what you do.", "Steve Jobs")
-    ]
-    return random.choice(backup)
+    except:
+        pass
+    return "The path to success is to take massive, determined action.", "Tony Robbins"
 
 def translate_to_id(text):
-    """Menerjemahkan teks ke Bahasa Indonesia."""
     try:
-        translated = GoogleTranslator(source='en', target='id').translate(text)
-        return translated
+        return GoogleTranslator(source='en', target='id').translate(text)
     except:
-        return text # Jika gagal, gunakan teks asli
+        return text
 
-def generate_abstract_image(output_path, quote_text, author):
-    # Ukuran Gambar
-    w, h = 1000, 1000
-    bg_color = (random.randint(0, 30), random.randint(0, 30), random.randint(0, 30))
-    img = Image.new('RGB', (w, h), color=bg_color)
-    draw = ImageDraw.Draw(img)
+def generate_neon_abstract(output_path, quote_text, author):
+    # Dimensi High Definition
+    w, h = 1080, 1080
+    # Background Gelap Deep Space
+    img = Image.new('RGB', (w, h), color=(5, 5, 15))
+    draw = ImageDraw.Draw(img, 'RGBA')
 
-    # Seni Abstrak Sederhana
-    for _ in range(40):
-        color = (random.randint(40, 200), random.randint(40, 200), random.randint(40, 200))
-        x1, y1 = random.randint(0, w), random.randint(0, h)
-        x2, y2 = random.randint(0, w), random.randint(0, h)
-        draw.line([x1, y1, x2, y2], fill=color, width=random.randint(1, 4))
-        draw.rectangle([x1, y1, x1+10, y1+10], outline=color)
+    # Warna-warna Neon Cyberpunk
+    neon_colors = [
+        (255, 0, 255, 150),  # Magenta
+        (0, 255, 255, 150),  # Cyan
+        (50, 255, 50, 150),  # Neon Green
+        (255, 255, 0, 150),  # Yellow Neon
+        (255, 50, 50, 150)   # Red Neon
+    ]
 
+    # Layer 1: Partikel Debu Neon (Background)
+    for _ in range(200):
+        x, y = random.randint(0, w), random.randint(0, h)
+        size = random.randint(1, 3)
+        draw.ellipse([x, y, x+size, y+size], fill=random.choice(neon_colors))
+
+    # Layer 2: Garis Futuristik / Grid acak
+    for _ in range(15):
+        color = random.choice(neon_colors)
+        x1 = random.randint(0, w)
+        draw.line([x1, 0, x1, h], fill=(color[0], color[1], color[2], 30), width=1)
+        y1 = random.randint(0, h)
+        draw.line([0, y1, w, y1], fill=(color[0], color[1], color[2], 30), width=1)
+
+    # Layer 3: Neon Streaks (Garis cahaya menyala)
+    for _ in range(10):
+        color = random.choice(neon_colors)
+        x_start = random.randint(0, w)
+        y_start = random.randint(0, h)
+        length = random.randint(100, 500)
+        # Efek Glow (Garis tebal transparan + garis tipis terang)
+        draw.line([x_start, y_start, x_start+length, y_start+length], fill=(color[0], color[1], color[2], 50), width=15)
+        draw.line([x_start, y_start, x_start+length, y_start+length], fill=(255, 255, 255, 200), width=2)
+
+    # Tambahkan Blur sedikit agar menyatu
     img = img.filter(ImageFilter.GaussianBlur(radius=1))
-    draw = ImageDraw.Draw(img)
+    draw = ImageDraw.Draw(img, 'RGBA')
 
-    # Pengaturan Teks (Bungkus Teks agar tidak keluar gambar)
-    margin = 80
-    current_h = 400
+    # LOAD FONT
+    font_file = download_font()
+    font_main = ImageFont.truetype(font_file, 55)
+    font_auth = ImageFont.truetype(font_file, 35)
+
+    # Wrap Teks (Center Alignment)
     words = quote_text.split()
     lines = []
     line = ""
-    
     for word in words:
-        if len(line + word) < 35:
+        if font_main.getlength(line + word) < 850:
             line += word + " "
         else:
-            lines.append(line)
+            lines.append(line.strip())
             line = word + " "
-    lines.append(line)
-    lines.append(f"\n— {author}")
+    lines.append(line.strip())
 
-    # Menulis teks ke gambar
-    for l in lines:
-        draw.text((margin, current_h), l, fill="white")
-        current_h += 40 # Jarak baris
+    # Hitung posisi Vertical Center
+    line_height = 80
+    current_y = (h - (len(lines) * line_height)) // 2
+
+    # Warna Font Acak Neon untuk Teks Utama
+    text_color = random.choice([(255, 255, 255), (0, 255, 255), (255, 0, 255)])
+
+    for line in lines:
+        # Center Horizontal
+        w_text = font_main.getlength(line)
+        current_x = (w - w_text) // 2
+        
+        # Glow Effect pada Text
+        draw.text((current_x+3, current_y+3), line, fill=(0,0,0,180), font=font_main) # Shadow
+        draw.text((current_x, current_y), line, fill=text_color, font=font_main)
+        current_y += line_height
+
+    # Nama Author
+    auth_txt = f"— {author}"
+    auth_x = (w - font_auth.getlength(auth_txt)) // 2
+    draw.text((auth_x, current_y + 40), auth_txt, fill=(200, 200, 200), font=font_auth)
 
     img.save(output_path)
 
 def send_to_telegram(image_path):
     token = os.getenv('TELEGRAM_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    if not token or not chat_id:
-        return
+    if not token or not chat_id: return
     
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
     with open(image_path, 'rb') as photo:
-        requests.post(url, data={'chat_id': chat_id}, files={'photo': photo}, timeout=20)
+        requests.post(url, data={'chat_id': chat_id, 'caption': 'Bot Quote Futuristik ⚡️'}, files={'photo': photo})
 
 if __name__ == "__main__":
-    print("Memulai bot...")
+    print("Generating Cyberpunk Quote...")
     raw_quote, author = get_random_quote()
-    print(f"Quote asli: {raw_quote}")
-    
     indo_quote = translate_to_id(raw_quote)
-    print(f"Terjemahan: {indo_quote}")
-    
-    path = "result.png"
-    generate_abstract_image(path, indo_quote, author)
+    path = "neon_quote.png"
+    generate_neon_abstract(path, indo_quote, author)
     send_to_telegram(path)
-    print("Selesai!")
+    print("Success sent to Telegram!")
