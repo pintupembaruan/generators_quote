@@ -4,27 +4,12 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from deep_translator import GoogleTranslator
 
-# --- KONFIGURASI DOWNLOAD FONT ---
-def download_font():
-    font_url = "https://github.com/google/fonts/raw/main/ofl/orbitron/static/Orbitron-Bold.ttf"
-    font_path = "font_futuristic.ttf"
-    if not os.path.exists(font_path):
-        try:
-            r = requests.get(font_url)
-            with open(font_path, 'wb') as f:
-                f.write(r.content)
-        except:
-            return None # Fallback ke default jika gagal
-    return font_path
-
 # --- AMBIL QUOTE & TERJEMAHAN ---
 def get_quote_indo():
     try:
-        # Ambil dari API
         res = requests.get("https://zenquotes.io/api/random", timeout=10).json()
         en_quote = res[0]['q']
         author = res[0]['a']
-        # Terjemahkan
         id_quote = GoogleTranslator(source='en', target='id').translate(en_quote)
         return id_quote, author
     except:
@@ -33,68 +18,77 @@ def get_quote_indo():
 # --- GENERATOR GAMBAR NEON FUTURISTIK ---
 def create_neon_image(text, author, output):
     w, h = 1080, 1080
-    # Background gelap total
-    img = Image.new('RGB', (w, h), color=(5, 5, 10))
+    img = Image.new('RGB', (w, h), color=(5, 5, 15))
     draw = ImageDraw.Draw(img, 'RGBA')
 
-    # Warna Neon Acak
+    # Warna Neon
     colors = [(0, 255, 255, 180), (255, 0, 255, 180), (50, 255, 50, 180), (255, 255, 0, 180)]
     main_color = random.choice(colors)
     font_color = random.choice([(255, 255, 255), (0, 255, 255), (255, 255, 0)])
 
-    # Gambar Partikel & Garis Neon Acak
-    for _ in range(60):
+    # Gambar Dekorasi Neon
+    for _ in range(80):
         x1, y1 = random.randint(0, w), random.randint(0, h)
-        x2, y2 = random.randint(0, w), random.randint(0, h)
-        draw.line([x1, y1, x2, y2], fill=(main_color[0], main_color[1], main_color[2], 40), width=random.randint(1, 2))
-        draw.ellipse([x1, y1, x1+5, y1+5], fill=random.choice(colors))
+        size = random.randint(2, 6)
+        draw.ellipse([x1, y1, x1+size, y1+size], fill=random.choice(colors))
+        if _ < 15:
+            draw.line([random.randint(0,w), 0, random.randint(0,w), h], fill=(main_color[0], main_color[1], main_color[2], 30))
 
-    # Efek Glow (Blur)
-    img = img.filter(ImageFilter.GaussianBlur(radius=1))
+    img = img.filter(ImageFilter.GaussianBlur(radius=2))
     draw = ImageDraw.Draw(img, 'RGBA')
 
-    # Font Setup
-    f_path = download_font()
-    if f_path:
-        font_main = ImageFont.truetype(f_path, 65)
-        font_auth = ImageFont.truetype(f_path, 40)
-    else:
+    # LOAD FONT DARI SISTEM UBUNTU (GitHub Actions)
+    # Mencari font yang pasti ada setelah di-install di workflow
+    possible_fonts = [
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "Arial.ttf"
+    ]
+    
+    font_main = None
+    for path in possible_fonts:
+        if os.path.exists(path):
+            font_main = ImageFont.truetype(path, 60)
+            font_auth = ImageFont.truetype(path, 35)
+            break
+    
+    if not font_main:
         font_main = ImageFont.load_default()
         font_auth = ImageFont.load_default()
 
-    # Wrap Text agar ke tengah
+    # Wrap Text
     words = text.split()
     lines = []
     curr_line = ""
     for word in words:
-        if font_main.getlength(curr_line + word) < 800:
+        # Cek lebar kata jika menggunakan font truetype
+        text_width = font_main.getlength(curr_line + word) if hasattr(font_main, 'getlength') else len(curr_line + word) * 30
+        if text_width < 850:
             curr_line += word + " "
         else:
             lines.append(curr_line.strip())
             curr_line = word + " "
     lines.append(curr_line.strip())
 
-    # Tentukan posisi Y (Vertical Center)
-    total_h = len(lines) * 90
-    current_y = (h - total_h) // 2
+    # Posisi Vertikal
+    line_spacing = 80
+    current_y = (h - (len(lines) * line_spacing)) // 2
 
-    # Gambar Teks (Center Horizontal)
+    # Gambar Text Center
     for line in lines:
-        line_w = font_main.getlength(line)
+        line_w = font_main.getlength(line) if hasattr(font_main, 'getlength') else len(line) * 30
         current_x = (w - line_w) // 2
-        # Shadow/Glow Text
-        draw.text((current_x+4, current_y+4), line, fill=(0,0,0,150), font=font_main)
+        draw.text((current_x+3, current_y+3), line, fill=(0,0,0,200), font=font_main) # Shadow
         draw.text((current_x, current_y), line, fill=font_color, font=font_main)
-        current_y += 90
+        current_y += line_spacing
 
-    # Gambar Author
+    # Author
     auth_txt = f"— {author}"
-    auth_x = (w - font_auth.getlength(auth_txt)) // 2
-    draw.text((auth_x, current_y + 40), auth_txt, fill=(180, 180, 180), font=font_auth)
+    auth_w = font_auth.getlength(auth_txt) if hasattr(font_auth, 'getlength') else len(auth_txt) * 20
+    draw.text(((w - auth_w) // 2, current_y + 40), auth_txt, fill=(200, 200, 200), font=font_auth)
 
     img.save(output)
 
-# --- KIRIM KE TELEGRAM ---
 def send_telegram(path):
     token = os.getenv('TELEGRAM_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
@@ -108,4 +102,3 @@ if __name__ == "__main__":
     file_name = "post.png"
     create_neon_image(quote, author, file_name)
     send_telegram(file_name)
-    print("Bot Berhasil Berjalan!")
